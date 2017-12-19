@@ -142,7 +142,10 @@ class CircularList(list):
 	def __getitem__(self, x):
 		if isinstance(x, slice):
 			return CircularList(self[x] for x in self._rangeify(x))
-		return super().__getitem__(x % len(self))
+		return super().__getitem__(self._wrap(x))
+
+	def _wrap(self, x):
+		return x % len(self)
 
 	def _rangeify(self, slice):
 		start, stop, step = slice.start, slice.stop, slice.step
@@ -153,6 +156,9 @@ class CircularList(list):
 		if step is None:
 			step = 1
 		return range(start, stop, step)
+
+	def insert(self, pos, x):
+		super().insert(self._wrap(pos), x)
 
 
 def first_index(predicate, seq):
