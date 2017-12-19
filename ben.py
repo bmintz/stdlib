@@ -94,23 +94,16 @@ class Vector(tuple):
 	def __add__(self, other):
 		return self.__oper(other, _operator.add)
 
-	__radd__ = __add__
-
 	def __sub__(self, other):
 		return self.__oper(other, _operator.sub)
-
-	# subtraction is not commutative, so will this work?
-	#__rsub__ = __sub__
 
 	def __mul__(self, other):
 		return self.__oper(other, _operator.mul)
 
-	#__rmul__ = __mul__
+	__rmul__ = __mul__
 
 	def __truediv__(self, other):
 		return self.__oper(other, _operator.truediv)
-
-	#__rtruediv__ = __truediv__
 
 
 def _b_file(t: _Iterable, offset=1):
