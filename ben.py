@@ -8,6 +8,19 @@ import functools as _functools
 import operator as _operator
 import re as _re
 import string as _string
+import sys as _sys
+
+
+def status_line(*args):
+	print(*args, file=sys.stderr, end='\b'*len('\n'.join(map(str, args))))
+
+
+def do_until(x, func, condition):
+	while True:
+		x = func(x)
+		if condition(x):
+			break
+	return x
 
 
 def curry(func):
