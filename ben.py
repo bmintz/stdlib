@@ -230,16 +230,16 @@ class Vector(tuple):
 		return super().__new__(cls, args)
 
 	def __oper(self, other, operator):
-		if isinstance(other, _Iterable):
-			new = list(other)
-			for i, value in enumerate(self):
-				try:
-					new[i] = operator(new[i], value)
-				except IndexError:
-					raise ValueError('operands must have the same dimensions')
-			return tuple(new)
-		else:
+		if not isinstance(other, _Iterable):
 			raise TypeError('operand must be iterable')
+
+		new = list(other)
+		for i, value in enumerate(self):
+			try:
+				new[i] = operator(new[i], value)
+			except IndexError:
+				raise ValueError('operands must have the same dimensions')
+		return tuple(new)
 
 	def __add__(self, other):
 		return self.__oper(other, _operator.add)
