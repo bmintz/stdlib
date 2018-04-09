@@ -312,7 +312,7 @@ def first_index(predicate, seq):
 			return i
 	raise ValueError
 	# alternatively:
-	# return next(i for i, c in enumerate(seq) if predicate(seq))
+	# return next(i for i, c in enumerate(seq) if predicate(c))
 
 
 def first_whitespace(string):
