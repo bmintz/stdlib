@@ -2,20 +2,174 @@
 # encoding: utf-8
 
 from collections import Iterable as _Iterable
-from inspect import signature as _signature
-import itertools as _itertools
+from dis import dis as _dis
 import functools as _functools
+from inspect import signature as _signature
+from io import StringIO as _StringIO
+import itertools as _itertools
 import operator as _operator
+from pprint import PrettyPrinter
+import pyperclip as _clipboard
+import random as _random
 import re as _re
 import string as _string
+import time as _time
 import sys as _sys
 
 
-def status_line(*args):
-	print(*args, file=sys.stderr, end='\b'*len('\n'.join(map(str, args))))
+def dis(x):
+	"""dis.dis, but returns a string instead of printing"""
+	with _StringIO() as out:
+		_dis(x, file=out)
+		return out.getvalue()
+
+
+def shuffled(t):
+	"""return a shuffled copy of list t"""
+	t = t[:]
+	_random.shuffle(t)
+	return t
+
+
+class AutoRepr(type):
+	"""a metaclass that can be used if you cba to write a __repr__ func"""
+
+	def __new__(cls, name, bases, attrs):
+		newcls = super().__new__(cls, name, bases, attrs)
+
+		# woah! i had no idea @wraps could be used like this
+		@_functools.wraps(newcls.__repr__)
+		def custom_repr(self):
+			dct = self.__dict__ or ''
+			return '{}.{}({})'.format(self.__class__.__module__, name, dct)
+
+		newcls.__repr__ = custom_repr
+		return newcls
+
+
+class AttributeBox:
+	"""an empty class, suitable for making objects with mutable attributes
+
+	For example, this is not possible to do with `x = object()`:
+	>>> x = AttributeBox()
+	>>> x.foo = lambda self, bar: print(bar)
+	>>> x.foo('baz')
+	baz
+	"""
+	pass
+
+
+def copy_result(func):
+	"""a decorator that copies the result of func to the clipboard
+	if copy=False, don't copy
+	if no args are given, use clipboard.paste() insetead"""
+	@_functools.wraps(func)
+	def wrapped(*args, **kwargs):
+		copy = kwargs.pop('copy', True)
+
+		if not args:
+			args = [_clipboard.paste()]
+		result = func(*args, **kwargs)
+
+		if copy:
+			_clipboard.copy(str(result))
+			# return
+
+		return result
+	return wrapped
+
+
+@copy_result
+def mock(text):
+	def uplower(text):
+		return _random.choice((str.upper, str.lower))(text)
+	return ''.join(map(uplower, text))
+
+
+@copy_result
+def escape_mentions(text):
+	"""Escapes @mentions in text. Useful for Discord"""
+	return text.replace('@', '@\N{zero width non-joiner}')
+
+
+@copy_result
+def strip_colors(text):
+	"""removes irc color codes from text"""
+	# credit to @smerity on SO: https://stackoverflow.com/a/970723
+	return _re.sub(r'\x03(?:\d{1,2}(?:,\d{1,2})?)?', '', text, _re.UNICODE)
+
+
+@copy_result
+def spaced_out(text):
+	"""n e e d   i   s a y   m o r e ?"""
+	return ' '.join(text)
+
+
+@copy_result
+def aesthetic(text):
+	"""ｍａｋｅｓ　ｔｅｘｔ　ｆａｎｃｙ"""
+	translations = {i: chr(i + 0xFEE0) for i in range(0x21, 0x7f)}
+	# ideographic space != 0x20 + 0xFEE0
+	translations[' '] = '\N{ideographic space}'
+	return text.translate(translations)
+
+
+@copy_result
+def regional(text):
+	"""converts text to regional indicators"""
+	_regionals = {
+		i + ord('a'): i + ord('\N{regional indicator symbol letter a}')
+		for i in range(26)}
+	flags = text.translate(regionals)
+	# prevent FR -> French Flag emoji
+	return '\N{zero width non-joiner}'.join(flags)
+
+
+class Singleton(type):
+	"""A singleton metaclass. Use it like `class Foo(metaclass=Singleton):`"""
+
+	_instances = {}
+	def __call__(cls, *args, **kwargs):
+		if cls not in cls._instances:
+			cls._instances[cls] = super().__call__(*args, **kwargs)
+		return cls._instances[cls]
+
+
+def pipe(inp, *funcs):
+	"""composes inp over func[::-1]
+
+	>>> pipe(' foo ', (str.lstrip, str.rstrip, str.upper)
+	'FOO'
+	>>> str.upper(str.rstrip(str.lstrip(' foo ')))
+	'FOO'
+	"""
+	for func in funcs:
+		inp = func(inp)
+	return inp
+
+
+def timeit(func):
+	@_functools.wraps(func)
+	def timed(*args, **kwargs):
+		start_time = _time.time()
+		result = func(*args, **kwargs)
+		log(func.__name__, 'ran in', _time.time() - start_time, 's')
+		return result
+	return timed
+
+def none(iterable):
+	"""a silly little alias for `not any(iterable)`"""
+	return not any(iterable)
+
+
+def log(*args, **kwargs):
+	kwargs['file'] = _sys.stderr
+	print(*args, **kwargs)
 
 
 def do_until(x, func, condition):
+	# lol this docstring just puts the code into English
+	"""assign x to func(x) until condition(x) is true. return x"""
 	while True:
 		x = func(x)
 		if condition(x):
@@ -68,6 +222,7 @@ def primes():
             del D[q]
 
         q += 1
+
 
 class Vector(tuple):
 	def __new__(cls, *args):
@@ -123,6 +278,9 @@ def write_b_file(t: _Iterable, filename='b_file.txt', offset=1):
 
 
 def flatten(l):
+	"""flattens l. treats str, bytes as non-iterable.
+	use more_itertools.flatten instead"""
+
 	for el in l:
 		if isinstance(el, _Iterable) and not isinstance(el, (str, bytes)):
 			yield from flatten(el)
@@ -131,6 +289,9 @@ def flatten(l):
 
 
 def input_iter():
+	"""yield successive lines of input until there is no more.
+	useful for reading files from stdin.
+	p.s. just iterate over sys.stdin, ya don't need this."""
 	while True:
 		try:
 			yield input()
@@ -175,32 +336,6 @@ def first_whitespace(string):
 		return first_index(str.isspace, string)
 	except ValueError as ex:
 		raise ValueError('no whitespace found') from ex
-
-
-def fancy_text(text):
-	"""makes text ｆａｎｃｙ"""
-
-	# mad props to the Aristois hacked client
-	# i dug through the obfuscated code to find this
-
-	fancy = []
-
-	for char in text:
-		if ord(char) in range(33, 127):
-			# U+FEE0 is the beginning of the fullwidth block
-			fancy.append(chr(ord(char) + 0xFEE0))
-		else:
-			fancy.append(char)
-
-	return ''.join(fancy)
-
-
-def fancy_text(text):
-	"""makes text ｆａｎｃｙ"""
-	return text.translate(
-		{i: chr(i + 0xFEE0) for i in range(0x21, 0x7f)}
-	)
-
 
 def convert_to_base(n, base, _acc=''):
 	if not n:
@@ -288,12 +423,33 @@ def initials_in(initials, full_name):
 #
 #	return len(initials) == 0
 
+
+@copy_result
 def clap(text):
-	return text.replace(' ', '\N{clapping hands sign}')
+	"""just👏a👏fucking👏meme👏"""
+	return '\N{clapping hands sign}'.join(text.split())
 
 
+@copy_result
+def animate(text):
+	emoji = []
+	format = ':anim_{}:'
+	alnum = set(_string.ascii_lowercase+_string.digits)
+	punctuation = {'!': 'bang', '?': 'ques', '&': 'amp'}
+	for letter in text:
+		letter = letter.lower()
+		if letter in alnum:
+			emoji.append(format.format(letter))
+		elif letter in punctuation:
+			emoji.append(format.format(punctuation[letter]))
+		else:
+			emoji.append(letter)
+	return ''.join(emoji)
+
+
+@copy_result
 def rot(s, n=13):
-	def _rot(char, n):
+	def rot(char):
 		if char not in _string.ascii_letters:
 			return char
 		alphabet = (_string.ascii_lowercase if char.islower() else _string.ascii_uppercase)
@@ -301,14 +457,22 @@ def rot(s, n=13):
 		pos = alphabet.index(char)
 		return alphabet[(pos + n) % len(alphabet)]
 
-	return ''.join(_rot(char, n) for char in s)
+	return ''.join(map(rot, s))
 
 
-"""Return string + 1F300 (start of emoji block)"""
-emoji_cipher = lambda string: ''.join(chr(ord(char) + 0x1F300) for char in string)
+@copy_result
+def emoji_cipher(text):
+	"""Return text + 1F300 (start of emoji block)"""
+	return ''.join(chr(ord(char) + 0x1F300) for char in text)
 
-"""Return the inverse of emoji_cipher()"""
-emoji_decipher = lambda string: ''.join(chr(ord(char) - 0x1F300) for char in string)
+@copy_result
+def emoji_decipher(text):
+	"""Return the inverse of emoji_cipher()"""
+	return ''.join(chr(ord(char) - 0x1F300) for char in text)
+
+
+def status_line(*args):
+	log(*args, end='\b'*len('\n'.join(map(str, args))))
 
 
 '''all the biomes needed to complete "Adventuring time"'''
@@ -405,4 +569,20 @@ onions = {
 	'webstats.torproject.org': 'http://gbinixxw7gnsh5jr.onion/',
 	'www-staging.torproject.org': 'http://krkzagd5yo4bvypt.onion/',
 	'www.onion-router.net': 'http://hzmun3rnnxjhkyhg.onion/',
-	'www.torproject.org': 'http://expyuzz4wqqyqhjn.onion/',}
+	'www.torproject.org': 'http://expyuzz4wqqyqhjn.onion/',
+
+	'0xacab.org': 'vivmyccb3jdb7yij.onion',
+	'account.riseup.net': 'j6uhdvbhz74oefxf.onion',
+	'black.riseup.net': 'cwoiopiifrlzcuos.onion',
+	'help.riseup.net': 'nzh3fv6jc6jskki3.onion',
+	'imap.riseup.net': 'zsolxunfmbfuq7wf.onion',
+	'lists.riseup.net': 'xpgylzydxykgdqyg.onion',
+	'mail.riseup.net': 'zsolxunfmbfuq7wf.onion',
+	'mx1.riseup.net': 'wy6zk3pmcwiyhiao.onion',
+	'pad.riseup.net': '5jp7xtmox6jyoqd5.onion',
+	'pop.riseup.net': 'zsolxunfmbfuq7wf.onion',
+	'riseup.net': 'nzh3fv6jc6jskki3.onion',
+	'share.riseup.net': '6zc6sejeho3fwrd4.onion',
+	'smtp.riseup.net': 'zsolxunfmbfuq7wf.onion',
+	'we.riseup.net': '7lvd7fa5yfbdqaii.onion',
+	'xmpp.riseup.net': '4cjw6cwpeaeppfqz.onion'}
