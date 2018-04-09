@@ -8,7 +8,6 @@ from inspect import signature as _signature
 from io import StringIO as _StringIO
 import itertools as _itertools
 import operator as _operator
-from pprint import PrettyPrinter
 import pyperclip as _clipboard
 import random as _random
 import re as _re
@@ -157,10 +156,6 @@ def timeit(func):
 		return result
 	return timed
 
-def none(iterable):
-	"""a silly little alias for `not any(iterable)`"""
-	return not any(iterable)
-
 
 def log(*args, **kwargs):
 	kwargs['file'] = _sys.stderr
@@ -288,17 +283,6 @@ def flatten(l):
 			yield el
 
 
-def input_iter():
-	"""yield successive lines of input until there is no more.
-	useful for reading files from stdin.
-	p.s. just iterate over sys.stdin, ya don't need this."""
-	while True:
-		try:
-			yield input()
-		except EOFError:
-			return
-
-
 class CircularList(list):
 	def __getitem__(self, x):
 		if isinstance(x, slice):
@@ -337,13 +321,14 @@ def first_whitespace(string):
 	except ValueError as ex:
 		raise ValueError('no whitespace found') from ex
 
+
 def convert_to_base(n, base, _acc=''):
 	if not n:
 		return int(_acc)
 	else:
 		# shoutout to compsci class
 		# dunno why this works
-		return ctb(n // base, base, str(n % base) + _acc)
+		return convert_to_base(n // base, base, str(n % base) + _acc)
 
 
 def convert_to_base(n: int, base):
@@ -360,27 +345,6 @@ def convert_to_base(n: int, base):
 def thue_morse():
 	for n in _itertools.count():
 		yield bin(n).count('1') % 2
-
-
-def memoize(f):
-	"""
-	Use functools.lru_cache instead
-	Memoization decorator for functions taking one or more arguments.
-	Does not work on functions that take unhashable arguments
-	or that take keyword arguments.
-	"""
-	class MemoDict(dict):
-		def __init__(self, f):
-			self.f = f
-
-		def __call__(self, *args):
-			return self[args]
-
-		def __missing__(self, args):
-			self[args] = ret = self.f(*args)
-			return ret
-
-	return MemoDict(f)
 
 
 memoize = _functools.lru_cache(maxsize=None)
@@ -428,23 +392,6 @@ def initials_in(initials, full_name):
 def clap(text):
 	"""just👏a👏fucking👏meme👏"""
 	return '\N{clapping hands sign}'.join(text.split())
-
-
-@copy_result
-def animate(text):
-	emoji = []
-	format = ':anim_{}:'
-	alnum = set(_string.ascii_lowercase+_string.digits)
-	punctuation = {'!': 'bang', '?': 'ques', '&': 'amp'}
-	for letter in text:
-		letter = letter.lower()
-		if letter in alnum:
-			emoji.append(format.format(letter))
-		elif letter in punctuation:
-			emoji.append(format.format(punctuation[letter]))
-		else:
-			emoji.append(letter)
-	return ''.join(emoji)
 
 
 @copy_result
